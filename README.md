@@ -29,6 +29,7 @@ The OBS portion of the program allows us to record with optical cameras through 
      4. Specify the path to a `buffer_folder` (default: `D:/VideoCapture/SourceRecordBuffer`).
      5. Modify the default file name to ensure it doesn’t collide with other cameras' recordings.
      6. (Optional) If you want file splitting based on recording time or size, you can set this here.
+     7. (Optional) Look at the bitrate, the default is low.
 
 
 ### Step 3: Select the Main Camera
