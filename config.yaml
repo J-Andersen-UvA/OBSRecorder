@@ -1,0 +1,9 @@
+obs_connection:
+  obs_host: 'localhost'
+  obs_port: 4457
+  # Leave empty if no password is set
+  obs_password:
+
+paths:
+  buffer_folder: 'D:\VideoCapture\SourceRecordBuffer'
+  save_folder: 'D:\VideoCapture\TestVideos'
