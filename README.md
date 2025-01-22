@@ -42,8 +42,8 @@ The OBS portion of the program allows us to record with optical cameras through 
 In your `config.yaml`, set the following parameters:
 - `obs_host`: Host address of the OBS WebSocket server.
 - `obs_port`: Port for the OBS WebSocket server.
-- `obs_buffer_folder`: Path to the folder used by the Source Record plugin for buffer recordings.
-- `obs_save_folder`: Path to the folder where final recordings will be saved.
+- `buffer_folder`: Path to the folder used by the Source Record plugin for buffer recordings.
+- `save_folder`: Path to the folder where final recordings will be saved.
 
 
 ## Recording Workflow
