@@ -56,7 +56,7 @@ Once the setup is complete, you can control the recording via Python using the f
 obs = obsRecording.OBSController(args.obs_host, args.obs_port, args.obs_password, popUp=popUp.PopUp())
 
 # Set Save Location
-obs.set_save_location(args.obs_save_folder, gloss_name="testName")
+obs.set_save_location(args.obs_save_folder, vid_name="testName")
 
 # Set Buffer Folder location (should match the filter location of the Source Record plugin)
 obs.set_buffer_folder(args.obs_buffer_folder)
