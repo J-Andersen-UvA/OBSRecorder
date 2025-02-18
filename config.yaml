@@ -7,3 +7,7 @@ obs_connection:
 paths:
   buffer_folder: 'D:\VideoCapture\SourceRecordBuffer'
   save_folder: 'D:\VideoCapture\TestVideos'
+
+target_machine:
+  ip: 'localhost'
+  port: 4422
