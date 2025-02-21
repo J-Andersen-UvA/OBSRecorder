@@ -54,18 +54,22 @@ class OBSController:
 
     def stop_recording(self):
         self.recording_controller.stop_recording()
+        self.statusCode = OBSStatus.IDLE
 
     def set_record_directory(self, path):
         self.recording_controller.set_record_directory(path)
 
     def set_save_location(self, root_folder, vid_name="Recording"):
         self.file_manager.set_save_location(root_folder, vid_name)
+        self.statusCode = OBSStatus.IDLE
 
     def move_recorded_files(self, max_retries=6, delay=0.5):
         self.file_manager.move_recorded_files(max_retries, delay)
+        self.statusCode = OBSStatus.IDLE
 
     def prepend_vid_name_last_recordings(self, vid_name=None, max_retries=6, delay=0.5):
         self.file_manager.prepend_vid_name_last_recordings(vid_name, max_retries, delay)
+        self.statusCode = OBSStatus.IDLE
     
     def set_buffer_folder(self, path):
         self.file_manager.set_buffer_folder(path)
