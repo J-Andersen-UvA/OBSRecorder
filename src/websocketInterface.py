@@ -35,15 +35,20 @@ class OBSWebSocketInterface:
                 return
             elif message.startswith("SetName"):
                 print(f"[WebSocket] Received 'SetName' message: {message}")
-                self.obs_controller.set_save_location(self.save_folder, message.lstrip("SetName"))
-            elif message == "SendFilePrevious":
-                print(f"[WebSocket] Received 'SendFilePrevious' message.")
+                self.obs_controller.set_save_location(self.save_folder, message.lstrip("SetName "))
+            elif message.startswith("SendFilePrevious"):
+                print(f"[WebSocket] Received 'SendFilePrevious' message: {message}")
+                host, port = message.split(" ")[1], int(message.split(" ")[2])
                 last_folder = self.obs_controller.file_manager.last_used_folder
                 if last_folder is None:
                     print("[WebSocket] No previous folder found.")
+                elif not os.path.exists(last_folder):
+                    print(f"[WebSocket] Previous folder '{last_folder}' does not exist.")
+                elif host is None or port is None:
+                    print("[WebSocket] Invalid host or port.")
                 else:
                     for file in os.listdir(last_folder):
-                        send_file(self.server_host, self.server_port, os.path.join(last_folder, file))
+                        send_file(host, port, os.path.join(last_folder, file))
             else:
                 print(f"[WebSocket] Received unknown message: {message}")
 

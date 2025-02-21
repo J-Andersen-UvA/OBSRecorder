@@ -9,5 +9,9 @@ paths:
   save_folder: 'D:\VideoCapture\TestVideos'
 
 target_machine:
-  ip: 'localhost'
+  ip: '192.168.0.211'
+  port: 4422
+
+receiver_machine:
+  ip: '192.168.0.180'
   port: 4422
