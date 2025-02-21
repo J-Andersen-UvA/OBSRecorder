@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 class OBSStatus(Enum):
     NOT_CONNECTED = "Not connected to OBS"
@@ -138,7 +139,9 @@ class OBSController:
             try:
                 self.parent.ws.stop_record()
                 print("[OBS] Stopped recording.")
+                time.sleep(1)
                 self.parent.file_manager.move_recorded_files()
+                time.sleep(1)
                 self.parent.file_manager.prepend_vid_name_last_recordings()
                 self.parent.statusCode = OBSStatus.RECORDING_STOPPED
             except Exception as e:
@@ -192,7 +195,7 @@ class OBSController:
 
             os.makedirs(session_folder, exist_ok=True)
 
-            self.parent.recording_controller.set_record_directory(session_folder)
+            # self.parent.recording_controller.set_record_directory(session_folder)
             self.last_used_folder = session_folder
             print(f"[OBS] Save path set to: {self.last_used_folder}")
 
