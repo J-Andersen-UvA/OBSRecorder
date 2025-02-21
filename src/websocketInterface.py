@@ -5,6 +5,7 @@ import websockets
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from obsRecording import OBSController
+from src_sendAndReceive.sendFile import send_file
 
 class OBSWebSocketInterface:
     def __init__(self, host, port, obs_host, obs_port, obs_password, save_folder, buffer_folder):
@@ -35,6 +36,14 @@ class OBSWebSocketInterface:
             elif message.startswith("SetName"):
                 print(f"[WebSocket] Received 'SetName' message: {message}")
                 self.obs_controller.set_save_location(self.save_folder, message.lstrip("SetName"))
+            elif message == "SendFilePrevious":
+                print(f"[WebSocket] Received 'SendFilePrevious' message.")
+                last_folder = self.obs_controller.file_manager.last_used_folder
+                if last_folder is None:
+                    print("[WebSocket] No previous folder found.")
+                else:
+                    for file in os.listdir(last_folder):
+                        send_file(self.server_host, self.server_port, os.path.join(last_folder, file))
             else:
                 print(f"[WebSocket] Received unknown message: {message}")
 

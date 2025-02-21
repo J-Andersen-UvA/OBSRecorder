@@ -84,4 +84,14 @@ if __name__ == '__main__':
     # Wait for recording to finish
     time.sleep(2)
     asyncio.get_event_loop().run_until_complete(send_message("Stop"))
+
+    # Send previous file
+    from src.src_sendAndReceive.receiveFiles import FileReceiver
+    async def start_file_receiver():
+        receiver = FileReceiver(args.target_host, args.target_port, args.save_folder)
+        await receiver.start_server()
+
+    asyncio.get_event_loop().run_until_complete(start_file_receiver())
+
+    asyncio.get_event_loop().run_until_complete(send_message("SendFilePrevious"))
     asyncio.get_event_loop().run_until_complete(send_message("Kill"))
