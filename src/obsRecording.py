@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 class OBSStatus(Enum):
     NOT_CONNECTED = "Not connected to OBS"
@@ -6,6 +7,9 @@ class OBSStatus(Enum):
     RECORDING_STARTED = "Recording started"
     RECORDING_STOPPED = "Recording stopped"
     ERROR = "Error"
+    IDLE = "Idle"
+    KILL = "Kill"
+    SAVING = "Saving"
 
 class OBSController:
     """
@@ -30,7 +34,7 @@ class OBSController:
             self.connection_manager.connect()
             self.recording_controller = self.RecordingController(self)
             self.file_manager = self.FileManagementController(self)
-            self.statusCode = OBSStatus.CONNECTED
+            self.statusCode = OBSStatus.IDLE
         else:
             self.recording_controller = None
             self.file_manager = None
@@ -42,17 +46,26 @@ class OBSController:
 
     def connect(self):
         self.connection_manager.connect()
+        self.statusCode = OBSStatus.CONNECTED
 
     def disconnect(self):
         self.connection_manager.disconnect()
+        self.statusCode = OBSStatus.KILL
 
     def start_recording(self):
+        if self.statusCode != OBSStatus.IDLE:
+            print("[OBS ERROR] OBS is not IDLE. Cannot start recording.")
+            return
+
         if self.ws:
             self.recording_controller.start_recording()
         else:
             print("[OBS ERROR] Not connected to OBS WebSocket. Cannot start recording.")
 
     def stop_recording(self):
+        if self.statusCode != OBSStatus.RECORDING_STARTED:
+            print("[OBS ERROR] Recording is not active. Cannot stop recording.")
+            return
         self.recording_controller.stop_recording()
         self.statusCode = OBSStatus.IDLE
 
@@ -60,14 +73,20 @@ class OBSController:
         self.recording_controller.set_record_directory(path)
 
     def set_save_location(self, root_folder, vid_name="Recording"):
+        if self.statusCode != OBSStatus.IDLE:
+            print("[OBS ERROR] OBS is not IDLE. Cannot set save location.")
+            return
+        self.statusCode = OBSStatus.SAVING
         self.file_manager.set_save_location(root_folder, vid_name)
         self.statusCode = OBSStatus.IDLE
 
     def move_recorded_files(self, max_retries=6, delay=0.5):
+        self.statusCode = OBSStatus.SAVING
         self.file_manager.move_recorded_files(max_retries, delay)
         self.statusCode = OBSStatus.IDLE
 
     def prepend_vid_name_last_recordings(self, vid_name=None, max_retries=6, delay=0.5):
+        self.statusCode = OBSStatus.SAVING
         self.file_manager.prepend_vid_name_last_recordings(vid_name, max_retries, delay)
         self.statusCode = OBSStatus.IDLE
     
@@ -125,6 +144,10 @@ class OBSController:
                 print(f"[OBS ERROR] Failed to set recording directory in OBS: {e}")
 
         def start_recording(self):
+            if self.parent.statusCode != OBSStatus.IDLE:
+                print("[OBS ERROR] OBS is not IDLE. Cannot start recording.")
+                return
+
             if not self.parent.ws:
                 print("[OBS ERROR} WebSocket connection not established. Cannot start recording.")
                 return
@@ -136,15 +159,21 @@ class OBSController:
                 print(f"[OBS ERROR] Failed to start recording: {e}")
 
         def stop_recording(self):
+            if self.parent.statusCode != OBSStatus.RECORDING_STARTED:
+                print("[OBS ERROR] Recording is not active. Cannot stop recording.")
+                return
+
             if not self.parent.ws:
                 print("[OBS ERROR] WebSocket connection not established. Cannot stop recording.")
                 return
             try:
                 self.parent.ws.stop_record()
                 print("[OBS] Stopped recording.")
+                time.sleep(1)
                 self.parent.file_manager.move_recorded_files()
+                time.sleep(1)
                 self.parent.file_manager.prepend_vid_name_last_recordings()
-                self.parent.statusCode = OBSStatus.RECORDING_STOPPED
+                self.parent.statusCode = OBSStatus.IDLE
             except Exception as e:
                 print(f"[OBS ERROR] Failed to stop recording: {e}")
 
@@ -196,7 +225,7 @@ class OBSController:
 
             os.makedirs(session_folder, exist_ok=True)
 
-            self.parent.recording_controller.set_record_directory(session_folder)
+            # self.parent.recording_controller.set_record_directory(session_folder)
             self.last_used_folder = session_folder
             print(f"[OBS] Save path set to: {self.last_used_folder}")
 
