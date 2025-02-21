@@ -1,7 +1,7 @@
-import socket
+import asyncio
 import os
 
-class FileReceiver:
+class AsyncFileReceiver:
     def __init__(self, host, port, output_folder):
         self.host = host
         self.port = port
@@ -10,37 +10,53 @@ class FileReceiver:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
-    def receive_file(self, connection):
-        file_size = int(connection.recv(1024).decode())
-        file_name = connection.recv(1024).decode()
-        file_path = os.path.join(self.output_folder, file_name)
+    async def receive_file(self, reader, writer):
+        try:
+            # Read the file size (first 10 bytes)
+            file_size_data = await reader.readexactly(10)
+            file_size = int(file_size_data.decode().strip())  # Convert to integer
 
-        with open(file_path, 'wb') as file:
+            # Read the file name (until newline)
+            file_name_data = await reader.readuntil(b"\n")
+            file_name = file_name_data.decode().strip()  # Remove trailing newline
+
+            file_path = os.path.join(self.output_folder, file_name)
+            print(f"Receiving file: {file_name} ({file_size} bytes)...")
+
+            # Read the file contents
             bytes_received = 0
-            while bytes_received < file_size:
-                data = connection.recv(1024)
-                if not data:
-                    break
-                file.write(data)
-                bytes_received += len(data)
-        print(f"Received file: {file_name}")
+            with open(file_path, 'wb') as file:
+                while bytes_received < file_size:
+                    chunk = await reader.read(min(1024, file_size - bytes_received))
+                    if not chunk:
+                        break
+                    file.write(chunk)
+                    bytes_received += len(chunk)
 
-    def start_server(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((self.host, self.port))
-        server_socket.listen(1)
-        print(f"Server listening on {self.host}:{self.port}")
+            print(f"Received file: {file_name}")
 
-        while True:
-            connection, address = server_socket.accept()
-            print(f"Connection from {address}")
-            self.receive_file(connection)
-            connection.close()
+            # Close connection
+            writer.close()
+            await writer.wait_closed()
 
-# example usage
+        except Exception as e:
+            print(f"Error receiving file: {e}")
+
+    async def start_server(self):
+        server = await asyncio.start_server(
+            self.receive_file, self.host, self.port
+        )
+        addr = server.sockets[0].getsockname()
+        print(f"Async server listening on {addr}")
+
+        async with server:
+            await server.serve_forever()
+
+# Example usage
 if __name__ == "__main__":
     HOST = 'localhost'
     PORT = 5123
     OUTPUT_FOLDER = './out'
-    receiver = FileReceiver(HOST, PORT, OUTPUT_FOLDER)
-    receiver.start_server()
+
+    receiver = AsyncFileReceiver(HOST, PORT, OUTPUT_FOLDER)
+    asyncio.run(receiver.start_server())  # Run the server
