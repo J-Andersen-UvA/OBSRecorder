@@ -1,9 +1,21 @@
+# Of the machine running the OBS instance
 obs_connection:
   obs_host: 'localhost'
   obs_port: 4457
   # Leave empty if no password is set
   obs_password:
 
+# Of your own machine
 paths:
   buffer_folder: 'D:\VideoCapture\SourceRecordBuffer'
   save_folder: 'D:\VideoCapture\TestVideos'
+
+# Of the machine running the OBS instance
+target_machine:
+  ip: '192.168.0.211'
+  port: 4422
+
+# Of the location to send the files to after they are recorded
+receiver_machine:
+  ip: '192.168.0.180'
+  port: 4422
