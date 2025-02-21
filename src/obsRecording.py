@@ -53,6 +53,10 @@ class OBSController:
         self.connection_manager.disconnect()
         self.statusCode = OBSStatus.KILL
 
+    def pop_all_queued_operations(self):
+        while self.queued_operations:
+            self.queued_operations.pop(0)()
+
     def start_recording(self):
         if self.statusCode != OBSStatus.IDLE:
             print("[OBS ERROR] OBS is not IDLE. Cannot start recording.")
@@ -89,14 +93,14 @@ class OBSController:
         self.file_manager.move_recorded_files(max_retries, delay)
         self.statusCode = OBSStatus.IDLE
         if self.queued_operations:
-            self.queued_operations.pop(0)()
+            self.pop_all_queued_operations()
 
     def prepend_vid_name_last_recordings(self, vid_name=None, max_retries=6, delay=0.5):
         self.statusCode = OBSStatus.SAVING
         self.file_manager.prepend_vid_name_last_recordings(vid_name, max_retries, delay)
         self.statusCode = OBSStatus.IDLE
         if self.queued_operations:
-            self.queued_operations.pop(0)()
+            self.pop_all_queued_operations()
     
     def set_buffer_folder(self, path):
         self.file_manager.set_buffer_folder(path)
@@ -183,7 +187,7 @@ class OBSController:
                 self.parent.file_manager.prepend_vid_name_last_recordings()
                 self.parent.statusCode = OBSStatus.IDLE
                 if self.parent.queued_operations:
-                    self.parent.queued_operations.pop(0)()
+                    self.parent.pop_all_queued_operations()
             except Exception as e:
                 print(f"[OBS ERROR] Failed to stop recording: {e}")
 
