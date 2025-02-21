@@ -1,5 +1,6 @@
 import asyncio
 import os
+import argparse
 
 class AsyncFileReceiver:
     def __init__(self, host, port, output_folder):
@@ -54,9 +55,18 @@ class AsyncFileReceiver:
 
 # Example usage
 if __name__ == "__main__":
-    HOST = 'localhost'
-    PORT = 5123
-    OUTPUT_FOLDER = './out'
+    # make host, port and output_folder flags for the script
+    parser = argparse.ArgumentParser(description="Async File Receiver")
+    parser.add_argument('--host', type=str, default='localhost', help='Host to listen on')
+    parser.add_argument('--port', type=int, default=5123, help='Port to listen on')
+    parser.add_argument('--output_folder', type=str, default='./out', help='Folder to save received files')
+
+    args = parser.parse_args()
+    print(args)
+
+    HOST = args.host
+    PORT = args.port
+    OUTPUT_FOLDER = args.output_folder
 
     receiver = AsyncFileReceiver(HOST, PORT, OUTPUT_FOLDER)
     asyncio.run(receiver.start_server())  # Run the server
