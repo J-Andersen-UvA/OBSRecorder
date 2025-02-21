@@ -27,6 +27,7 @@ class OBSController:
         self.password = password
         self.popUp = popUp
         self.ws = None  # Initialize the client without parameters
+        self.queued_operations = []
 
         # Internal components
         self.connection_manager = self.ConnectionManager(self)
@@ -74,21 +75,28 @@ class OBSController:
 
     def set_save_location(self, root_folder, vid_name="Recording"):
         if self.statusCode != OBSStatus.IDLE:
-            print("[OBS ERROR] OBS is not IDLE. Cannot set save location.")
-            return
+            print("[OBS ERROR] OBS is not IDLE. Queueing save location...")
+            self.queued_operations.append(lambda: self.set_save_location(root_folder, vid_name))
+            return False
         self.statusCode = OBSStatus.SAVING
         self.file_manager.set_save_location(root_folder, vid_name)
         self.statusCode = OBSStatus.IDLE
+        print(f"[OBS] Save location set!")
+        return True
 
     def move_recorded_files(self, max_retries=6, delay=0.5):
         self.statusCode = OBSStatus.SAVING
         self.file_manager.move_recorded_files(max_retries, delay)
         self.statusCode = OBSStatus.IDLE
+        if self.queued_operations:
+            self.queued_operations.pop(0)()
 
     def prepend_vid_name_last_recordings(self, vid_name=None, max_retries=6, delay=0.5):
         self.statusCode = OBSStatus.SAVING
         self.file_manager.prepend_vid_name_last_recordings(vid_name, max_retries, delay)
         self.statusCode = OBSStatus.IDLE
+        if self.queued_operations:
+            self.queued_operations.pop(0)()
     
     def set_buffer_folder(self, path):
         self.file_manager.set_buffer_folder(path)
@@ -174,6 +182,8 @@ class OBSController:
                 time.sleep(1)
                 self.parent.file_manager.prepend_vid_name_last_recordings()
                 self.parent.statusCode = OBSStatus.IDLE
+                if self.parent.queued_operations:
+                    self.parent.queued_operations.pop(0)()
             except Exception as e:
                 print(f"[OBS ERROR] Failed to stop recording: {e}")
 
