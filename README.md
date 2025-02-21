@@ -29,6 +29,7 @@ The OBS portion of the program allows us to record with optical cameras through 
      4. Specify the path to a `buffer_folder` (default: `D:/VideoCapture/SourceRecordBuffer`).
      5. Modify the default file name to ensure it doesn’t collide with other cameras' recordings.
      6. (Optional) If you want file splitting based on recording time or size, you can set this here.
+     7. (Optional) Look at the bitrate, the default is low.
 
 
 ### Step 3: Select the Main Camera
@@ -42,8 +43,8 @@ The OBS portion of the program allows us to record with optical cameras through 
 In your `config.yaml`, set the following parameters:
 - `obs_host`: Host address of the OBS WebSocket server.
 - `obs_port`: Port for the OBS WebSocket server.
-- `obs_buffer_folder`: Path to the folder used by the Source Record plugin for buffer recordings.
-- `obs_save_folder`: Path to the folder where final recordings will be saved.
+- `buffer_folder`: Path to the folder used by the Source Record plugin for buffer recordings.
+- `save_folder`: Path to the folder where final recordings will be saved.
 
 
 ## Recording Workflow
@@ -56,7 +57,7 @@ Once the setup is complete, you can control the recording via Python using the f
 obs = obsRecording.OBSController(args.obs_host, args.obs_port, args.obs_password, popUp=popUp.PopUp())
 
 # Set Save Location
-obs.set_save_location(args.obs_save_folder, gloss_name="testName")
+obs.set_save_location(args.obs_save_folder, vid_name="testName")
 
 # Set Buffer Folder location (should match the filter location of the Source Record plugin)
 obs.set_buffer_folder(args.obs_buffer_folder)
