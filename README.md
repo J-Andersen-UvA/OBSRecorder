@@ -8,8 +8,8 @@ The OBS portion of the program allows us to record with optical cameras through 
 ## Setup Instructions
 
 ### Step 1: Enable WebSocket Server in OBS
-1. Open OBS settings.
-2. Go to the **WebSocket Server Settings** section (requires OBS WebSocket plugin).
+1. Open OBS.
+2. Under tools, **WebSocket Server Settings** section.
 3. Enable the WebSocket server and note the following:
    - **Host** (default: `localhost`)
    - **Port** (default: `4444`)
