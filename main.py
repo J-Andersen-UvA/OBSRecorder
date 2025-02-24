@@ -34,7 +34,7 @@ class ConfigInfo:
 
         return True
 
-async def receiver_main(args):
+async def sender_main(args):
     from src.src_sendAndReceive.receiveFiles import AsyncFileReceiver, run_receiver_in_new_terminal
     import websockets
 
@@ -88,4 +88,4 @@ if __name__ == '__main__':
 
     # Example usage with WebSocket
     # Opening a websocket server to control OBS
-    asyncio.run(receiver_main(args))
+    asyncio.run(sender_main(args))

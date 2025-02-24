@@ -8,6 +8,27 @@ from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
 
 class OBSWebSocketInterface:
+    """
+    A WebSocket interface for controlling OBS (Open Broadcaster Software) through WebSocket messages.
+    This class provides methods to start and stop recording, set the save location, and send files from the previous recording session.
+    It listens for WebSocket messages and performs actions based on the received messages.
+    Attributes:
+        server_host (str): The host address for the WebSocket server.
+        server_port (int): The port number for the WebSocket server.
+        save_folder (str): The folder where recordings will be saved.
+        obs_controller (OBSController): An instance of OBSController to control OBS.
+        server (websockets.server): The WebSocket server instance.
+        stop_event (asyncio.Event): An event to signal server shutdown.
+    Methods:
+        handler(websocket):
+            Handles incoming WebSocket messages and performs actions based on the message content.
+        start_server_async():
+            Starts the WebSocket server asynchronously and waits for the "Kill" message to shut down the server.
+        shutdown_server():
+            Shuts down the WebSocket server.
+        start_server():
+            Starts the WebSocket server and runs it until shutdown.
+    """
     def __init__(self, host, port, obs_host, obs_port, obs_password, save_folder, buffer_folder):
         self.server_host = host
         self.server_port = port
