@@ -69,3 +69,60 @@ obs.start_recording()
 obs.stop_recording()
 ```
 
+## WebSocket interface
+This project provides a Python-based interface for controlling OBS through WebSockets.
+
+### Host
+The WebSocket server is implemented in the OBSWebSocketInterface class. It listens for WebSocket messages and executes commands accordingly.
+Attributes:
+- server_host (str): The host address for the WebSocket server.
+- server_port (int): The port number for the WebSocket server.
+- save_folder (str): The folder where recordings will be saved.
+- obs_controller (OBSController): An instance of OBSController to manage OBS.
+- server (websockets.server): The WebSocket server instance.
+- stop_event (asyncio.Event): An event used to signal server shutdown.
+
+Methods:
+- handler(websocket): Handles incoming WebSocket messages and processes commands.
+- start_server_async(): Starts the WebSocket server asynchronously and listens for the "Kill" message to shut down the server.
+- shutdown_server(): Shuts down the WebSocket server.
+- start_server(): Starts the WebSocket server and runs it until shutdown.
+
+Example starting server:
+```python
+obs_ws = OBSWebSocketInterface(server_host='localhost', server_port=8765, save_folder='/path/to/save')
+obs_ws.start_server()
+```
+
+### Client
+A WebSocket client is responsible for sending commands to the server. The client can initiate recording, stop recording, and request previous recorded files.
+Example sender (receiver_main):
+```python
+async def receiver_main(args):
+    from src.src_sendAndReceive.receiveFiles import AsyncFileReceiver, run_receiver_in_new_terminal
+    import websockets
+
+    async def send_message(message):
+        uri = f"ws://{args.target_host}:{args.target_port}"
+        async with websockets.connect(uri) as websocket:
+            await websocket.send(message)
+            print(f"Sent message: {message}")
+
+    # Launch the file receiver in a new terminal
+    run_receiver_in_new_terminal(args.receiver_host, args.receiver_port, args.save_folder, args.receiver_script_path, args.python_path)
+
+    # Send commands to control OBS
+    await send_message("SetName TEST6")
+    await send_message("Start")
+    await asyncio.sleep(4)
+    await send_message("Stop")
+    await send_message(f"SendFilePrevious {args.receiver_host} {args.receiver_port}")
+```
+
+Running the client:
+To send commands to the WebSocket server, run the sender script with appropriate arguments.
+```python
+import asyncio
+args = Namespace(target_host='localhost', target_port=8765, receiver_host='remote_host', receiver_port=9000, save_folder='/path/to/save', receiver_script_path='/path/to/script.py', python_path='python3')
+asyncio.run(receiver_main(args))
+```
