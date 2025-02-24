@@ -24,12 +24,13 @@ The OBS portion of the program allows us to record with optical cameras through 
 3. **Configure Source Record Plugin**:
    - For all cameras **except the main camera**:
      1. Go to the scene.
-     2. Add a **Source Record** filter to the camera source.
-     3. Set the **Record Mode** to `Recording`.
-     4. Specify the path to a `buffer_folder` (default: `D:/VideoCapture/SourceRecordBuffer`).
-     5. Modify the default file name to ensure it doesn’t collide with other cameras' recordings.
-     6. (Optional) If you want file splitting based on recording time or size, you can set this here.
-     7. (Optional) Look at the bitrate, the default is low.
+     2. Right click on the scene, and click filters.
+     3. Add a **Source Record** filter to the camera source.
+     4. Set the **Record Mode** to `Recording`.
+     5. Specify the path to a `buffer_folder` (default: `D:/VideoCapture/SourceRecordBuffer`).
+     6. Modify the default file name to ensure it doesn’t collide with other cameras' recordings.
+     7. (Optional) If you want file splitting based on recording time or size, you can set this here.
+     8. (Optional) Look at the bitrate, the default is low.
 
 
 ### Step 3: Select the Main Camera
