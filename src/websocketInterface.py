@@ -2,10 +2,14 @@ import asyncio
 import sys
 import time
 import websockets
+from zeroconf import Zeroconf, ServiceInfo
+import socket
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
+
+BROADCAST_NAME = "OBS.local."  # Use a fixed broadcast name for Zeroconf service discovery
 
 class OBSWebSocketInterface:
     """
@@ -38,6 +42,31 @@ class OBSWebSocketInterface:
         self.obs_controller.set_save_location(save_folder)
         self.server = None  # Store server reference
         self.stop_event = asyncio.Event()  # Event to signal shutdown
+
+        # Zeroconf setup
+        self.zeroconf = Zeroconf()
+
+        # Pick up your machine’s LAN IP and pack to 4-byte form
+        ip_str = socket.gethostbyname(socket.gethostname())
+        addr_bytes = socket.inet_aton(ip_str)
+
+        service_type = "_obs-ws._tcp.local."
+        service_name = f"OBS-Websocket Interface ({socket.gethostname()}).{service_type}"
+
+        props = {
+            "path": "/",
+            "format": "json"
+        }
+
+        self.service_info = ServiceInfo(
+            type_=service_type,
+            name=service_name,
+            addresses=[addr_bytes],        # <- list, not `address=`
+            port=self.server_port,
+            properties=props,
+            server=BROADCAST_NAME
+        )
+
 
     async def handler(self, websocket):
         async for message in websocket:
@@ -75,6 +104,7 @@ class OBSWebSocketInterface:
 
     async def start_server_async(self):
         print(f"[WebSocket] Starting server on {self.server_host}:{self.server_port}")
+        self.zeroconf.register_service(self.service_info)
         self.server = await websockets.serve(self.handler, self.server_host, self.server_port)
         await self.stop_event.wait()  # ✅ Wait until "Kill" is received
         await self.shutdown_server()
@@ -83,6 +113,9 @@ class OBSWebSocketInterface:
         print("[WebSocket] Shutting down server...")
         self.server.close()
         await self.server.wait_closed()
+
+        self.zeroconf.unregister_service(self.service_info)
+        self.zeroconf.close()
         print("[WebSocket] Server stopped.")
 
     def start_server(self):
@@ -90,5 +123,5 @@ class OBSWebSocketInterface:
 
 # Example usage
 if __name__ == "__main__":
-    ws_interface = OBSWebSocketInterface('localhost', 8765, 'localhost', 4457, None)
+    ws_interface = OBSWebSocketInterface('localhost', 8765, 'localhost', 4457, None, 'D:\\Media\\Videos\\OBS', 'D:\\Media\\Videos\\OBS\\SourceRecordBuffer')
     ws_interface.start_server()
