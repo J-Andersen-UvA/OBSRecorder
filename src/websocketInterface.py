@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
+import logging
 
 BROADCAST_NAME = "OBS.local."  # Use a fixed broadcast name for Zeroconf service discovery
 
@@ -33,7 +34,7 @@ class OBSWebSocketInterface:
         start_server():
             Starts the WebSocket server and runs it until shutdown.
     """
-    def __init__(self, host, port, obs_host, obs_port, obs_password, save_folder, buffer_folder):
+    def __init__(self, host, port, obs_host, obs_port, obs_password, save_folder, buffer_folder, service_type="_mocap._tcp.local."):
         self.server_host = host
         self.server_port = port
         self.save_folder = save_folder
@@ -50,8 +51,7 @@ class OBSWebSocketInterface:
         ip_str = socket.gethostbyname(socket.gethostname())
         addr_bytes = socket.inet_aton(ip_str)
 
-        service_type = "_obs-ws._tcp.local."
-        service_name = f"OBS-Websocket Interface ({socket.gethostname()}).{service_type}"
+        service_name = f"OBS.{service_type}"
 
         props = {
             "path": "/",
@@ -83,9 +83,17 @@ class OBSWebSocketInterface:
                 await websocket.close()
                 self.stop_event.set()  # Signal shutdown
                 return
+            elif message == "health":
+                check, result = self.obs_controller.file_manager.check_last_used_folder()
+                if check:
+                    print("[WebSocket] Last used folder is valid.")
+                    await websocket.send("Good")
+                else:
+                    print("[WebSocket] Last used folder is invalid.")
+                    await websocket.send(str(result))
             elif message.startswith("SetName"):
-                print(f"[WebSocket] Received 'SetName' message: {message}")
-                self.obs_controller.set_save_location(self.save_folder, message.lstrip("SetName "))
+                print(f"[WebSocket] Received 'SetName' message: {message[len('SetName '):]}")
+                self.obs_controller.set_save_location(self.save_folder, message[len("SetName "):])
             elif message.startswith("SendFilePrevious"):
                 print(f"[WebSocket] Received 'SendFilePrevious' message: {message}")
                 host, port = message.split(" ")[1], int(message.split(" ")[2])
@@ -119,9 +127,12 @@ class OBSWebSocketInterface:
         print("[WebSocket] Server stopped.")
 
     def start_server(self):
-        asyncio.run(self.start_server_async())
+        loop = asyncio.get_event_loop()
+        logging.getLogger("websockets").setLevel(logging.CRITICAL)
+        loop.run_until_complete(self.start_server_async())
+
 
 # Example usage
 if __name__ == "__main__":
-    ws_interface = OBSWebSocketInterface('localhost', 8765, 'localhost', 4457, None, 'D:\\Media\\Videos\\OBS', 'D:\\Media\\Videos\\OBS\\SourceRecordBuffer')
+    ws_interface = OBSWebSocketInterface('0.0.0.0', 8765, 'localhost', 4457, None, 'D:\\VideoCapture\\pineappleRecordings', 'D:\\VideoCapture\\SourceRecordBuffer')
     ws_interface.start_server()

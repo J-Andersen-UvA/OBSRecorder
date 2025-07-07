@@ -1,5 +1,10 @@
 from enum import Enum
 import time
+import os
+import cv2
+import numpy as np
+import subprocess
+import tempfile
 
 class OBSStatus(Enum):
     NOT_CONNECTED = "Not connected to OBS"
@@ -85,7 +90,7 @@ class OBSController:
         self.statusCode = OBSStatus.SAVING
         self.file_manager.set_save_location(root_folder, vid_name)
         self.statusCode = OBSStatus.IDLE
-        print(f"[OBS] Save location set!")
+        print(f"[OBS] Save location set to: {self.file_manager.current_using_folder}!")
         return True
 
     def move_recorded_files(self, max_retries=6, delay=0.5):
@@ -197,8 +202,14 @@ class OBSController:
             self.parent = parent
             self.buffer_folder = r"D:\VideoCapture\SourceRecordBuffer"
             self.last_vid_name = None
-            self.last_used_folder = None
+            self.current_using_folder = None
             self.last_used_root_folder = None
+
+            # vars for health check
+            self.last_used_folder = None
+            self.sessions_started = False
+            self.health_check = True
+            self.previous_values = {}        
 
         def set_buffer_folder(self, path):
             """Sets the location to store the recorded files temporarily."""
@@ -240,8 +251,9 @@ class OBSController:
             os.makedirs(session_folder, exist_ok=True)
 
             # self.parent.recording_controller.set_record_directory(session_folder)
-            self.last_used_folder = session_folder
-            print(f"[OBS] Save path set to: {self.last_used_folder}")
+            self.last_used_folder = self.current_using_folder
+            self.current_using_folder = session_folder
+            print(f"[OBS] Save path set to: {self.current_using_folder}")
 
         def get_incremental_folder(self, base_path):
             """Finds the next available subfolder number in the given base path."""
@@ -257,20 +269,22 @@ class OBSController:
             import shutil
             import time
 
-            if not self.last_used_folder:
+            if not self.current_using_folder:
                 print("[OBS ERROR] No folder set for the recording. Can't move the files.")
                 return
+
+            self.sessions_started = True
 
             try:
                 for filename in os.listdir(self.buffer_folder):
                     file_path = os.path.join(self.buffer_folder, filename)
                     if os.path.isfile(file_path):
-                        destination = os.path.join(self.last_used_folder, filename)
+                        destination = os.path.join(self.current_using_folder, filename)
                         retries = 0
                         while retries < max_retries:
                             try:
                                 shutil.move(file_path, destination)
-                                print(f"[OBS] Moved {filename} to {self.last_used_folder}")
+                                print(f"[OBS] Moved {filename} to {self.current_using_folder}")
                                 break
                             except PermissionError as e:
                                 print(f"[OBS ERROR] Error moving {filename}: {e}. Retrying in {delay} seconds...")
@@ -281,12 +295,116 @@ class OBSController:
             except Exception as e:
                 print(f"[OBS ERROR] Failed to move the files: {e}")
 
+        def check_last_used_folder(self):
+            """Check if the last used folder exists. Check if it contains any files. Check if the files are not just black screens. On success return True, else return False."""
+            # Check if a recording session has been started
+            if not self.sessions_started:
+                print("[OBS ERROR] No recording session has been started yet. Can't check the last used folder.")
+                return True, "Good"
+
+            # Check if values have changed since last health check
+            # if self.previous_values == {
+            #     "last_used_folder": self.last_used_folder,
+            #     "current_using_folder": self.current_using_folder,
+            #     "last_vid_name": self.last_vid_name,
+            # }:
+            #     print("[OBS] No changes detected since last health check. Skipping checks.")
+            #     return self.health_check
+
+            self.health_check = False
+
+            # Check presence of current_using_folder and its contents
+            if not self.last_used_folder:
+                error = "[OBS ERROR] No last used folder set for the recording. Can't check the last used folder."
+                return False, error
+
+            # Check if the last used folder exists
+            if not os.path.exists(self.last_used_folder):
+                error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' does not exist."
+                print(error)
+                return False, error
+
+            # Check if the last used folder contains any files
+            files = os.listdir(self.last_used_folder)
+            if not files:
+                error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' is empty."
+                return False, error
+
+            # Check if the files are not just black screens
+            for file in files:
+                file_path = os.path.join(self.last_used_folder, file)
+                if not os.path.isfile(file_path):
+                    continue
+                
+                # Check if the first frame is the same as the last frame
+                if file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+                    if self.is_first_last_same(file_path):
+                        error = f"[OBS ERROR] Video '{file}' has the same first and last frame."
+                        print(error)
+                        return False, error
+                    
+            self.previous_values = {
+                "last_used_folder": self.last_used_folder,
+                "current_using_folder": self.current_using_folder,
+                "last_vid_name": self.last_vid_name
+            }
+            self.health_check = True
+            print(f"[OBS] Last used folder is valid and contains valid files: {self.last_used_folder}")
+            return True, "Good"
+        
+        def ffmpeg_extract_frame(self, video_path, time_sec, tmp_png_path):
+            """
+            Extract a single frame at `time_sec`:
+            - if time_sec >= 0: number of seconds from the start
+            - if time_sec <  0: number of seconds from the end (using -sseof)
+            """
+            # Build seek arguments
+            if time_sec >= 0:
+                seek_args = ["-ss", str(time_sec)]
+            else:
+                # -sseof is a global option: seek from end-of-file
+                seek_args = ["-sseof", str(time_sec)]
+            
+            cmd = (
+                ["ffmpeg", "-y"]
+                + seek_args
+                + ["-i", video_path,
+                "-frames:v", "1",
+                "-q:v", "2",        # pretty good quality
+                tmp_png_path]
+            )
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+        def is_first_last_same(self, video_path, diff_thresh=1e-6):
+            # Create two temp PNG paths
+            fd1, png1 = tempfile.mkstemp(suffix=".png"); os.close(fd1)
+            fd2, png2 = tempfile.mkstemp(suffix=".png"); os.close(fd2)
+
+            try:
+                # 1) Grab exactly the first frame
+                self.ffmpeg_extract_frame(video_path, 0.0, png1)
+                # 2) Grab exactly the last frame (0.1s from the end)
+                self.ffmpeg_extract_frame(video_path, -0.1, png2)
+
+                # Load & convert to grayscale
+                g1 = cv2.cvtColor(cv2.imread(png1), cv2.COLOR_BGR2GRAY)
+                g2 = cv2.cvtColor(cv2.imread(png2), cv2.COLOR_BGR2GRAY)
+
+                # Compute normalized MSE
+                mse = np.mean((g1.astype("float32") - g2.astype("float32")) ** 2)
+                norm_mse = mse / (255.0**2)
+                return norm_mse < diff_thresh
+
+            finally:
+                os.remove(png1)
+                os.remove(png2)
+
         def prepend_vid_name_last_recordings(self, vid_name=None, max_retries=6, delay=0.5):
             """Prepend the gloss name to the last recorded files."""
             import os
             import time
 
-            if not self.last_used_folder:
+            if not self.current_using_folder:
                 print("[OBS ERROR] No folder set for the recording. Can't prepend the gloss name.")
                 return
 
@@ -294,14 +412,14 @@ class OBSController:
                 vid_name = self.last_vid_name
 
             try:
-                for filename in os.listdir(self.last_used_folder):
-                    file_path = os.path.join(self.last_used_folder, filename)
+                for filename in os.listdir(self.current_using_folder):
+                    file_path = os.path.join(self.current_using_folder, filename)
                     if os.path.isfile(file_path):
                         new_filename = f"{vid_name}_{filename}"
                         retries = 0
                         while retries < max_retries:
                             try:
-                                os.rename(file_path, os.path.join(self.last_used_folder, new_filename))
+                                os.rename(file_path, os.path.join(self.current_using_folder, new_filename))
                                 print(f"[OBS] Renamed {filename} to {new_filename}")
                                 break
                             except PermissionError as e:
