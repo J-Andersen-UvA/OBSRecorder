@@ -9,6 +9,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
 import logging
+import yaml
+
+# Load endpoint configuration from YAML file
+with open('config_endpoint.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+    ENDPOINT = config.get('endpoint', None)
 
 BROADCAST_NAME = "OBS.local."  # Use a fixed broadcast name for Zeroconf service discovery
 
@@ -69,6 +75,7 @@ class OBSWebSocketInterface:
 
 
     async def handler(self, websocket):
+        global ENDPOINT
         async for message in websocket:
             if message == "Start":
                 print("[WebSocket] Received 'Start' message.")
@@ -76,6 +83,9 @@ class OBSWebSocketInterface:
             elif message == "Stop":
                 print("[WebSocket] Received 'Stop' message.")
                 self.obs_controller.stop_recording()
+                if ENDPOINT is not None:
+                    print("[WebSocket] Uploading recording to server...")
+                    self.obs_controller.upload_last_recordings(ENDPOINT)
             elif message == "Kill":
                 print("[WebSocket] Received 'Kill' message.")
                 self.obs_controller.disconnect()
@@ -85,12 +95,17 @@ class OBSWebSocketInterface:
                 return
             elif message == "health":
                 check, result = self.obs_controller.file_manager.check_last_used_folder()
-                if check:
+                check2, result2 = self.obs_controller.last_upload_health
+                if check and check2:
                     print("[WebSocket] Last used folder is valid.")
                     await websocket.send("Good")
                 else:
-                    print("[WebSocket] Last used folder is invalid.")
-                    await websocket.send(str(result))
+                    if not check:
+                        print("[WebSocket] Last used folder is invalid.")
+                        await websocket.send(str(result))
+                    if check and not check2:
+                        print("[WebSocket] Last upload health check failed.")
+                        await websocket.send(str(result2))
             elif message.startswith("SetName"):
                 print(f"[WebSocket] Received 'SetName' message: {message[len('SetName '):]}")
                 self.obs_controller.set_save_location(self.save_folder, message[len("SetName "):])

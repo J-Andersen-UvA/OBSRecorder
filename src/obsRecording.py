@@ -5,6 +5,40 @@ import cv2
 import numpy as np
 import subprocess
 import tempfile
+# import src_sendAndReceive.sendFile as sendFile
+import requests
+
+def send_file_to_endpoint(endpoint: str, file_path: str, field_name: str = "file", extra_data: dict = None, headers: dict = None) -> requests.Response:
+    """
+    Sends a file to a specified HTTP endpoint using multipart/form-data.
+
+    :param endpoint: The server's upload URL (e.g. "https://signcollect.nl/studioFilesServer/upload-mocap").
+    :param file_path: Path to the file to be sent.
+    :param field_name: The form field name expected by the server for file uploads.
+    :param extra_data: Optional dict of additional form fields to include in the POST.
+    :param headers: Optional dict of HTTP headers to include (e.g. authentication tokens).
+    :return: The `requests.Response` object from the server.
+    :raises: `requests.HTTPError` if the upload fails (non-2xx status code).
+    """
+    print(f"[OBS sender] Sending file '{file_path}' to endpoint '{endpoint}'...")
+    # Verify the file exists
+    if not os.path.isfile(file_path):
+        raise FileNotFoundError(f"No such file: {file_path}")
+
+    # Prepare extra form fields
+    data = extra_data or {}
+    
+    # Open the file in binary mode and send it
+    with open(file_path, "rb") as f:
+        files = {
+            field_name: (os.path.basename(file_path), f)
+        }
+        # Perform the POST
+        resp = requests.post(endpoint, files=files, data=data, headers=headers)
+    
+    # Raise an exception for error codes (4xx, 5xx)
+    resp.raise_for_status()
+    return resp
 
 class OBSStatus(Enum):
     NOT_CONNECTED = "Not connected to OBS"
@@ -33,6 +67,7 @@ class OBSController:
         self.popUp = popUp
         self.ws = None  # Initialize the client without parameters
         self.queued_operations = []
+        self.last_upload_health = True, "Good"  # Health check for last upload
 
         # Internal components
         self.connection_manager = self.ConnectionManager(self)
@@ -109,6 +144,32 @@ class OBSController:
     
     def set_buffer_folder(self, path):
         self.file_manager.set_buffer_folder(path)
+    
+    def upload_last_recordings(self, endpoint, field_name="file", extra_data=None, headers=None):
+        """
+        Uploads the last recorded files to a specified HTTP endpoint using multipart/form-data.
+        """
+        if not self.file_manager.current_using_folder:
+            error = "[OBS ERROR] No last used folder set for the recording. Cannot upload recordings."
+            print(error)
+            self.last_upload_health = False, error
+            return False, error
+
+        if not os.path.exists(self.file_manager.current_using_folder):
+            error = f"[OBS ERROR] Last used folder '{self.file_manager.current_using_folder}' does not exist."
+            print(error)
+            self.last_upload_health = False, error
+            return False, error
+
+        print(f"[OBS] Uploading last recordings from '{self.file_manager.current_using_folder}' to '{endpoint}'...")
+        for file in os.listdir(self.file_manager.current_using_folder):
+            file_path = os.path.join(self.file_manager.current_using_folder, file)
+            if os.path.isfile(file_path):
+                print(send_file_to_endpoint(endpoint, file_path, field_name, extra_data, headers))
+
+        print("[OBS] Upload completed.")
+        self.last_upload_health = True, "Good"
+        return True, "Good"
 
     # Internal Components
     class ConnectionManager:
@@ -342,7 +403,7 @@ class OBSController:
                         error = f"[OBS ERROR] Video '{file}' has the same first and last frame."
                         print(error)
                         return False, error
-                    
+
             self.previous_values = {
                 "last_used_folder": self.last_used_folder,
                 "current_using_folder": self.current_using_folder,
@@ -351,7 +412,7 @@ class OBSController:
             self.health_check = True
             print(f"[OBS] Last used folder is valid and contains valid files: {self.last_used_folder}")
             return True, "Good"
-        
+
         def ffmpeg_extract_frame(self, video_path, time_sec, tmp_png_path):
             """
             Extract a single frame at `time_sec`:
