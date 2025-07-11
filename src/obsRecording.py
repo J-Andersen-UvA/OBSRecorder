@@ -252,6 +252,8 @@ class OBSController:
                 time.sleep(1)
                 self.parent.file_manager.prepend_vid_name_last_recordings()
                 self.parent.statusCode = OBSStatus.IDLE
+                # Set last used folder to the current using folder for the health checks
+                self.parent.file_manager.last_used_folder = self.parent.file_manager.current_using_folder
                 if self.parent.queued_operations:
                     self.parent.pop_all_queued_operations()
             except Exception as e:
@@ -270,7 +272,8 @@ class OBSController:
             self.last_used_folder = None
             self.sessions_started = False
             self.health_check = True
-            self.previous_values = {}        
+            self.last_checked_folder = None
+            self.error = ""
 
         def set_buffer_folder(self, path):
             """Sets the location to store the recorded files temporarily."""
@@ -305,14 +308,14 @@ class OBSController:
             date_folder = os.path.join(root_folder, datetime.now().strftime("%Y-%m-%d"))
             os.makedirs(date_folder, exist_ok=True)
 
-            # Create a subfolder for each recording session with incremental numbers
+            # Create a subfolder for each recording with incremental numbers
             session_folder_base = os.path.join(date_folder, vid_name)
             session_folder = self.get_incremental_folder(session_folder_base)
 
             os.makedirs(session_folder, exist_ok=True)
 
             # self.parent.recording_controller.set_record_directory(session_folder)
-            self.last_used_folder = self.current_using_folder
+            # self.last_used_folder = self.current_using_folder
             self.current_using_folder = session_folder
             print(f"[OBS] Save path set to: {self.current_using_folder}")
 
@@ -362,34 +365,29 @@ class OBSController:
             if not self.sessions_started:
                 print("[OBS ERROR] No recording session has been started yet. Can't check the last used folder.")
                 return True, "Good"
-
-            # Check if values have changed since last health check
-            # if self.previous_values == {
-            #     "last_used_folder": self.last_used_folder,
-            #     "current_using_folder": self.current_using_folder,
-            #     "last_vid_name": self.last_vid_name,
-            # }:
-            #     print("[OBS] No changes detected since last health check. Skipping checks.")
-            #     return self.health_check
+            
+            if self.last_checked_folder == self.last_used_folder:
+                print("[OBS] Last used folder has not changed since last health check. Skipping checks.")
+                return self.health_check, self.error
 
             self.health_check = False
 
             # Check presence of current_using_folder and its contents
             if not self.last_used_folder:
-                error = "[OBS ERROR] No last used folder set for the recording. Can't check the last used folder."
-                return False, error
+                self.error = "[OBS ERROR] No last used folder set for the recording. Can't check the last used folder."
+                return False, self.error
 
             # Check if the last used folder exists
             if not os.path.exists(self.last_used_folder):
-                error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' does not exist."
-                print(error)
-                return False, error
+                self.error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' does not exist."
+                print(self.error)
+                return False, self.error
 
             # Check if the last used folder contains any files
             files = os.listdir(self.last_used_folder)
             if not files:
-                error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' is empty."
-                return False, error
+                self.error = f"[OBS ERROR] Last used folder '{self.last_used_folder}' is empty."
+                return False, self.error
 
             # Check if the files are not just black screens
             for file in files:
@@ -400,15 +398,11 @@ class OBSController:
                 # Check if the first frame is the same as the last frame
                 if file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
                     if self.is_first_last_same(file_path):
-                        error = f"[OBS ERROR] Video '{file}' has the same first and last frame."
-                        print(error)
-                        return False, error
+                        self.error = f"[OBS ERROR] Video '{file}' has the same first and last frame."
+                        print(self.error)
+                        return False, self.error
 
-            self.previous_values = {
-                "last_used_folder": self.last_used_folder,
-                "current_using_folder": self.current_using_folder,
-                "last_vid_name": self.last_vid_name
-            }
+            self.last_checked_folder = self.last_used_folder
             self.health_check = True
             print(f"[OBS] Last used folder is valid and contains valid files: {self.last_used_folder}")
             return True, "Good"
