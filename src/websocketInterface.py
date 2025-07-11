@@ -8,11 +8,13 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
-import logging
 import yaml
+import logging
+
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
 # Load endpoint configuration from YAML file
-with open('config_endpoint.yaml', 'r') as file:
+with open('C:\\Users\\VICON\\Desktop\\Code\\recording\\OBSRecorder\\OBSRecorder\\src\\config_endpoint.yaml', 'r') as file:
     config = yaml.safe_load(file)
     ENDPOINT = config.get('endpoint', None)
 
@@ -143,7 +145,6 @@ class OBSWebSocketInterface:
 
     def start_server(self):
         loop = asyncio.get_event_loop()
-        logging.getLogger("websockets").setLevel(logging.CRITICAL)
         loop.run_until_complete(self.start_server_async())
 
 
