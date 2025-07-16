@@ -10,6 +10,9 @@ from obsRecording import OBSController
 from src_sendAndReceive.sendFile import send_file
 import logging
 import yaml
+import wifiIp
+
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
 # Load endpoint configuration from YAML file
 with open('config_endpoint.yaml', 'r') as file:
@@ -54,8 +57,7 @@ class OBSWebSocketInterface:
         self.zeroconf = Zeroconf()
 
         # Pick up your machine’s LAN IP and pack to 4-byte form
-        ip_str = socket.gethostbyname(socket.gethostname())
-        addr_bytes = socket.inet_aton(ip_str)
+        addr_bytes = socket.inet_aton(wifiIp.get_ip_from_wifi())
 
         service_name = f"OBS.{service_type}"
 
